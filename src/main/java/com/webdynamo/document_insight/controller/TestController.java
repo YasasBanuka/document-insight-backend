@@ -3,6 +3,7 @@ package com.webdynamo.document_insight.controller;
 import com.webdynamo.document_insight.model.Document;
 import com.webdynamo.document_insight.service.DocumentParserService;
 import com.webdynamo.document_insight.service.DocumentService;
+import com.webdynamo.document_insight.service.TextChunkingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -107,5 +109,18 @@ public class TestController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
+    }
+
+    @PostMapping("/test-chunk")
+    public ResponseEntity<Object> testChunk(@RequestParam("text") String text) {
+        TextChunkingService chunker = new TextChunkingService();
+        List<String> chunks = chunker.chunkText(text);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("originalLength", text.length());
+        result.put("chunkCount", chunks.size());
+        result.put("chunks", chunks);
+
+        return ResponseEntity.ok(result);
     }
 }
