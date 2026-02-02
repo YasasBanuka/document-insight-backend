@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: document-insight
+
+  # Add file upload configuration
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB      # Max file size per request
+      max-request-size: 10MB   # Max total request size
+      file-size-threshold: 2KB # Files larger than this are written to disk
+
+  datasource:
+    url: jdbc:postgresql://localhost:5433/document_insight
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+server:
+  port: 8080
+
+# Custom application properties
+application:
+  file-storage:
+    upload-dir: C:/Users/ADMIN/.gemini/antigravity/scratch/document-insight-engine/document-insight/uploads
+
+logging:
+  level:
+    com.webdynamo.documentinsight: DEBUG
+    org.springframework.ai: DEBUG
