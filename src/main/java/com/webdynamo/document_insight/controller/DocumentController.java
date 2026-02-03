@@ -6,6 +6,7 @@ import com.webdynamo.document_insight.model.Document;
 import com.webdynamo.document_insight.model.DocumentChunk;
 import com.webdynamo.document_insight.service.DocumentChunkService;
 import com.webdynamo.document_insight.service.DocumentService;
+import com.webdynamo.document_insight.service.RAGQueryService;
 import com.webdynamo.document_insight.service.VectorSearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,8 @@ public class DocumentController {
     private final DocumentService documentService;
     private final DocumentChunkService documentChunkService;
     private final VectorSearchService vectorSearchService;
+    private final RAGQueryService ragQueryService;  // Add this field
+
 
     /**
      * Get all documents for a user
@@ -203,4 +206,59 @@ public class DocumentController {
             return ResponseEntity.badRequest().build();
         }
     }
+
+    /**
+     * Ask a question across all documents (RAG)
+     */
+    @GetMapping("/ask")
+    public ResponseEntity<Map<String, Object>> askQuestion(
+            @RequestParam("question") String question,
+            @RequestParam(value = "contextChunks", defaultValue = "3") int contextChunks) {
+
+        log.info("RAG Query: {}", question);
+
+        try {
+            String answer = ragQueryService.answerQuestion(question, contextChunks);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("question", question);
+            response.put("answer", answer);
+            response.put("contextChunks", contextChunks);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("RAG query failed", e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    /**
+     * Ask a question about a specific document (RAG)
+     */
+    @GetMapping("/{id}/ask")
+    public ResponseEntity<Map<String, Object>> askQuestionInDocument(
+            @PathVariable Long id,
+            @RequestParam("question") String question,
+            @RequestParam(value = "contextChunks", defaultValue = "3") int contextChunks) {
+
+        log.info("RAG Query in document {}: {}", id, question);
+
+        try {
+            String answer = ragQueryService.answerQuestionInDocument(id, question, contextChunks);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("documentId", id);
+            response.put("question", question);
+            response.put("answer", answer);
+            response.put("contextChunks", contextChunks);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("RAG query failed", e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
 }
