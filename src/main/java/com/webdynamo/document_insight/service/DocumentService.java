@@ -1,5 +1,6 @@
 package com.webdynamo.document_insight.service;
 
+import com.webdynamo.document_insight.exception.DocumentNotFoundException;
 import com.webdynamo.document_insight.model.Document;
 import com.webdynamo.document_insight.model.DocumentChunk;
 import com.webdynamo.document_insight.repo.DocumentChunkRepository;
@@ -52,7 +53,7 @@ public class DocumentService {
 
         // Check if document exists
         Document document = documentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Document not found with id: " + id));
+                .orElseThrow(() -> new DocumentNotFoundException(id));
 
         // Delete all chunks first
         documentChunkService.deleteAllChunksForDocument(id);

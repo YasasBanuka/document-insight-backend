@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -97,5 +98,70 @@ public class VectorSearchService {
 
         log.info("Found {} similar chunks in document", results.size());
         return results;
+    }
+
+    /**
+     * Search with pagination
+     */
+    public Map<String, Object> searchSimilarChunksWithPagination(
+            String query,
+            int page,
+            int size) {
+
+        log.info("Paginated search: query='{}', page={}, size={}", query, page, size);
+
+        // Generate query embedding
+        float[] queryEmbedding = embeddingService.generateEmbedding(query);
+        String queryVector = embeddingService.embeddingToVector(queryEmbedding);
+
+        // Calculate offset
+        int offset = page * size;
+
+        // Get total count
+        String countSql = """
+        SELECT COUNT(*) 
+        FROM document_chunks 
+        WHERE embedding IS NOT NULL
+        """;
+
+        Integer totalElements = jdbcTemplate.queryForObject(countSql, Integer.class);
+
+        // Get paginated results
+        String sql = """
+        SELECT 
+            dc.id,
+            dc.chunk_index,
+            dc.content,
+            dc.token_count,
+            d.filename,
+            d.id as document_id,
+            1 - (dc.embedding::vector <=> ?::vector) as similarity
+        FROM document_chunks dc
+        JOIN documents d ON dc.document_id = d.id
+        WHERE dc.embedding IS NOT NULL
+        ORDER BY dc.embedding::vector <=> ?::vector
+        LIMIT ? OFFSET ?
+        """;
+
+        List<Map<String, Object>> results = jdbcTemplate.queryForList(
+                sql,
+                queryVector,
+                queryVector,
+                size,
+                offset
+        );
+
+        // Build response
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", results);
+        response.put("page", page);
+        response.put("size", size);
+        response.put("totalElements", totalElements);
+        response.put("totalPages", (int) Math.ceil((double) totalElements / size));
+
+        log.info("Found {} results, page {} of {}",
+                results.size(), page, response.get("totalPages"));
+
+        return response;
     }
 }
