@@ -8,9 +8,14 @@ import com.webdynamo.document_insight.repo.DocumentRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -179,5 +184,71 @@ public class DocumentService {
         }
         log.info("All chunks embedded and saved successfully");
         return savedDocument;
+    }
+
+    /**
+     * Get document file as Resource for serving/downloading
+     */
+    public Resource getDocumentAsResource(Long documentId) {
+        log.info("Loading document as resource: {}", documentId);
+
+        // Get document metadata
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new DocumentNotFoundException(documentId));
+
+        try {
+            // Get file path
+            Path filePath = fileStorageService.getFilePath(document.getFilePath());
+
+            // Security check: ensure file exists and is readable
+            if (!Files.exists(filePath) || !Files.isReadable(filePath)) {
+                throw new RuntimeException("File not accessible: " + document.getFilename());
+            }
+
+            // Load file as Resource
+            Resource resource = new UrlResource(filePath.toUri());
+
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new RuntimeException("Could not read file: " + document.getFilename());
+            }
+
+            log.info("Document resource loaded successfully: {}", document.getFilename());
+            return resource;
+
+        } catch (MalformedURLException e) {
+            log.error("Error loading document as resource: {}", documentId, e);
+            throw new RuntimeException("Error loading document: " + e.getMessage(), e);
+        } catch (IOException e) {
+            log.error("Error checking file accessibility: {}", documentId, e);
+            throw new RuntimeException("Error accessing file: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Generate text preview for a document
+     */
+    public String generatePreview(Long documentId) {
+        log.info("Generating text preview for document: {}", documentId);
+
+        // Get document metadata
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new DocumentNotFoundException(documentId));
+
+        try {
+            // Get file path
+            Path filePath = fileStorageService.getFilePath(document.getFilePath());
+
+            // Use DocumentParserService to extract text
+            String text = documentParserService.parseDocument(filePath, document.getContentType());
+
+            log.info("Preview generated: {} characters extracted from document {}", 
+                    text.length(), documentId);
+
+            return text;
+
+        } catch (Exception e) {
+            log.error("Error generating preview for document: {}", documentId, e);
+            throw new RuntimeException("Failed to generate preview: " + e.getMessage(), e);
+        }
     }
 }

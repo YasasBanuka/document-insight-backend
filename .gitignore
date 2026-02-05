@@ -1,5 +1,6 @@
 # Compiled files
 target/
+build/
 *.class
 *.jar
 *.war
@@ -10,6 +11,7 @@ target/
 *.iml
 *.iws
 .vscode/
+.settings/
 .DS_Store
 
 # Spring Boot
@@ -37,6 +39,14 @@ Thumbs.db
 *.db
 *.sqlite
 
-# Environment variables
+# Secrets & Sensitive Data
 .env
-.env.local
+.env.*
+*.env
+application-*.yaml
+application-*.properties
+secrets/
+*.key
+*.pem
+*.p12
+*.jks

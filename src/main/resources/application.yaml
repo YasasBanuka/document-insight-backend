@@ -41,6 +41,12 @@ spring:
 server:
   port: 8080
 
+  # JWT Configuration (Phase 6)
+  jwt:
+    secret: ${JWT_SECRET:mySecretKeyThatIsAtLeast256BitsLongForHS256AlgorithmSecurityRequirement}
+    expiration: 86400000          # 24 hours (ms) access token
+    refresh-expiration: 604800000 # 7 days (ms) refresh token
+
 # Custom application properties
 application:
   file-storage:
