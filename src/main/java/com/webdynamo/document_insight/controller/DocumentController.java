@@ -3,6 +3,7 @@ package com.webdynamo.document_insight.controller;
 import com.webdynamo.document_insight.dto.DocumentDTO;
 import com.webdynamo.document_insight.dto.QuestionRequest;
 import com.webdynamo.document_insight.dto.UploadResponse;
+import com.webdynamo.document_insight.exception.DocumentNotFoundException;
 import com.webdynamo.document_insight.model.Document;
 import com.webdynamo.document_insight.model.DocumentChunk;
 import com.webdynamo.document_insight.service.DocumentChunkService;
@@ -16,6 +17,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -300,5 +305,69 @@ public class DocumentController {
         }
     }
 
+    /**
+     * Get original document file content (for PDF preview)
+     */
+    @Operation(
+            summary = "Get document content",
+            description = "Download or preview the original document file"
+    )
+    @GetMapping("/{id}/content")
+    public ResponseEntity<Resource> getDocumentContent(@PathVariable Long id) {
+        log.info("Fetching content for document: {}", id);
+
+        try {
+            // Get document metadata
+            Document document = documentService.getDocumentById(id)
+                    .orElseThrow(() -> new DocumentNotFoundException(id));
+
+            // Get file as Resource (handles all security checks)
+            Resource resource = documentService.getDocumentAsResource(id);
+
+            // Return file with correct content type and inline disposition for preview
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(document.getContentType()))
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "inline; filename=\"" + document.getFilename() + "\"")
+                    .body(resource);
+
+        } catch (DocumentNotFoundException e) {
+            log.error("Document not found: {}", id);
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error serving document content", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(null);
+        }
+    }
+
+    /**
+     * Get document preview as text (for DOCX/TXT)
+     */
+    @Operation(
+            summary = "Get document text preview",
+            description = "Get text content extracted from DOCX or TXT files"
+    )
+    @GetMapping("/{id}/preview")
+    public ResponseEntity<String> getDocumentPreview(@PathVariable Long id) {
+        log.info("Generating preview for document: {}", id);
+
+        try {
+            // Generate preview text using service
+            String previewText = documentService.generatePreview(id);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body(previewText);
+
+        } catch (DocumentNotFoundException e) {
+            log.error("Document not found: {}", id);
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error generating document preview", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to generate preview: " + e.getMessage());
+        }
+    }
 
 }
