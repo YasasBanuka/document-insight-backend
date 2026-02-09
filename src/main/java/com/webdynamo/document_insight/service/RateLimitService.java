@@ -93,4 +93,22 @@ public class RateLimitService {
         return bucket.getAvailableTokens();
     }
 
+    /**
+     * Get seconds until bucket refills (for Retry-After header)
+     */
+    public long getSecondsUntilRefill(Bucket bucket, boolean isAuthenticated) {
+        // If bucket has tokens available, no need to wait
+        if (bucket.getAvailableTokens() > 0) {
+            return 0;
+        }
+
+        // Otherwise, return the refill duration
+        Duration refillDuration = isAuthenticated
+                ? authenticatedRefillDuration
+                : unauthenticatedRefillDuration;
+
+        return refillDuration.getSeconds();
+    }
+
+
 }

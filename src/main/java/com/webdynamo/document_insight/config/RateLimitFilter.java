@@ -1,5 +1,7 @@
 package com.webdynamo.document_insight.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.webdynamo.document_insight.dto.ErrorResponse;
 import com.webdynamo.document_insight.model.User;
 import com.webdynamo.document_insight.service.RateLimitService;
 import io.github.bucket4j.Bucket;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 
 @Component
 @RequiredArgsConstructor
@@ -24,6 +27,7 @@ import java.io.IOException;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private final RateLimitService rateLimitService;
+    private final ObjectMapper objectMapper;
 
     @Override
     protected void doFilterInternal(
@@ -62,13 +66,35 @@ public class RateLimitFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
 
         } else {
-            // Rate limit exceeded - return 429
+            // Rate limit exceeded - return 429 with retry info
             log.warn("[{}] Rate limit exceeded for: {} {}", identifier, request.getMethod(), request.getRequestURI());
+
+            // Determine if authenticated
+            boolean isAuthenticated = authentication != null
+                    && authentication.isAuthenticated()
+                    && authentication.getPrincipal() instanceof User;
+
+            // Calculate retry-after seconds
+            long retryAfterSeconds = rateLimitService.getSecondsUntilRefill(bucket, isAuthenticated);
+
+            // Create structured error response
+            ErrorResponse errorResponse = new ErrorResponse(
+                    LocalDateTime.now(),
+                    429,
+                    "Too Many Requests",
+                    String.format("Rate limit exceeded. You can retry in %d seconds.", retryAfterSeconds),
+                    request.getRequestURI(),
+                    retryAfterSeconds
+            );
+
+            // Set response headers
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setContentType("application/json");
-            response.getWriter().write(
-                    "{\"error\":\"Too Many Requests\",\"message\":\"Rate limit exceeded. Please try again later.\"}"
-            );
+            response.setCharacterEncoding("UTF-8");
+            response.setHeader("Retry-After", String.valueOf(retryAfterSeconds));  // Standard HTTP header
+
+            // Write JSON response
+            response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
         }
     }
 
