@@ -41,6 +41,17 @@ spring:
 server:
   port: 8080
 
+# Rate Limiting Configuration
+rate-limit:
+  authenticated:
+    capacity: 100          # 100 requests allowed
+    refill-tokens: 100     # Refill 100 tokens
+    refill-duration: 1m    # Every 1 minute
+  unauthenticated:
+    capacity: 10           # 10 requests allowed
+    refill-tokens: 10      # Refill 10 tokens
+    refill-duration: 1m    # Every 1 minute
+
 # JWT Configuration
 jwt:
   secret: ${JWT_SECRET:mySecretKeyThatIsAtLeast256BitsLongForHS256AlgorithmSecurityRequirement}
