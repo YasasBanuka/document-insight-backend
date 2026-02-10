@@ -1,6 +1,6 @@
 spring:
   application:
-    name: document-insight
+    name: docura
 
   # Ollama AI Configuration
   ai:
@@ -51,6 +51,17 @@ rate-limit:
     capacity: 10           # 10 requests allowed
     refill-tokens: 10      # Refill 10 tokens
     refill-duration: 1m    # Every 1 minute
+
+# Actuator Configuration for Metrics
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus  # Expose health, metrics, prometheus
+      base-path: /actuator
+  metrics:
+    tags:
+      application: docura  # Tag all metrics with app name
 
 # JWT Configuration
 jwt:

@@ -3,8 +3,10 @@ package com.webdynamo.document_insight.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webdynamo.document_insight.dto.ErrorResponse;
 import com.webdynamo.document_insight.model.User;
+import com.webdynamo.document_insight.service.MetricsService;
 import com.webdynamo.document_insight.service.RateLimitService;
 import io.github.bucket4j.Bucket;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,6 +29,8 @@ import java.time.LocalDateTime;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private final RateLimitService rateLimitService;
+    private final MeterRegistry meterRegistry;
+    private final MetricsService metricsService;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -60,6 +64,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
             long remainingTokens = rateLimitService.getAvailableTokens(bucket);
             log.debug("[{}] Request allowed. Remaining tokens: {}", identifier, remainingTokens);
 
+            // Metric: successful request
+            metricsService.recordRateLimitAllowed(authentication != null
+                    && authentication.isAuthenticated());
+
             // Add rate limit info to response headers
             response.setHeader("X-Rate-Limit-Remaining", String.valueOf(remainingTokens));
 
@@ -68,6 +76,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
         } else {
             // Rate limit exceeded - return 429 with retry info
             log.warn("[{}] Rate limit exceeded for: {} {}", identifier, request.getMethod(), request.getRequestURI());
+
+            // Metric: rate limit violation
+            metricsService.recordRateLimitExceeded(
+                    authentication != null && authentication.isAuthenticated(),
+                    request.getRequestURI()
+            );
 
             // Determine if authenticated
             boolean isAuthenticated = authentication != null
