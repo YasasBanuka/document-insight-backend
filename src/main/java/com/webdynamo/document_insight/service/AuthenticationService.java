@@ -140,5 +140,43 @@ public class AuthenticationService {
         );
     }
 
+    /**
+     * Update user profile (name and email)
+     *
+     * @param userId User ID to update
+     * @param newName New name (optional, can be same as current)
+     * @param newEmail New email (optional, can be same as current)
+     * @return Updated user
+     * @throws RuntimeException if user not found or email already taken
+     */
+    public User updateUserProfile(Long userId, String newName, String newEmail) {
+        log.info("Updating profile for user ID: {}", userId);
+
+        // Find user
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Check if email changed and if new email is available
+        if (!user.getEmail().equals(newEmail)) {
+            if (userRepository.existsByEmail(newEmail)) {
+                log.warn("Email already in use: {}", newEmail);
+                throw new RuntimeException("Email already in use");
+            }
+            log.info("Updating email from {} to {}", user.getEmail(), newEmail);
+            user.setEmail(newEmail);
+        }
+
+        // Update name if provided
+        if (newName != null && !newName.trim().isEmpty()) {
+            user.setName(newName);
+        }
+
+        // Save and return
+        User updatedUser = userRepository.save(user);
+        log.info("Profile updated successfully for user: {}", userId);
+
+        return updatedUser;
+    }
+
 
 }

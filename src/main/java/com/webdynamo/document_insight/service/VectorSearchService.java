@@ -210,4 +210,84 @@ public class VectorSearchService {
         return results;
     }
 
+    /**
+     * Search similar chunks for user with pagination
+     */
+    public Map<String, Object> searchSimilarChunksForUserPaginated(
+            String query,
+            Long userId,
+            int page,
+            int size
+    ) {
+        log.info("Paginated vector search for user {}: '{}' (page: {}, size: {})",
+                userId, query, page, size);
+
+        try {
+            // Generate embedding for query
+            float[] queryEmbedding = embeddingService.generateEmbedding(query);
+
+            // Convert to pgvector format using existing method
+            String queryVector = embeddingService.embeddingToVector(queryEmbedding);
+
+            // Calculate pagination
+            int offset = page * size;
+
+            // Search with user filtering
+            String sql = """
+            SELECT 
+                dc.id,
+                dc.document_id,
+                dc.chunk_index,
+                dc.content,
+                dc.token_count,
+                d.filename,
+                d.user_id,
+                1 - (dc.embedding::vector <=> ?::vector) as similarity
+            FROM document_chunks dc
+            JOIN documents d ON dc.document_id = d.id
+            WHERE d.user_id = ?
+              AND dc.embedding IS NOT NULL
+            ORDER BY dc.embedding::vector <=> ?::vector
+            LIMIT ? OFFSET ?
+            """;
+
+            // Execute query (simpler than custom RowMapper)
+            List<Map<String, Object>> results = jdbcTemplate.queryForList(
+                    sql,
+                    queryVector,  // First ?
+                    userId,       // Second ?
+                    queryVector,  // Third ? (ORDER BY)
+                    size,         // Fourth ?
+                    offset        // Fifth ?
+            );
+
+            // Get total count for user
+            String countSql = """
+            SELECT COUNT(*)
+            FROM document_chunks dc
+            JOIN documents d ON dc.document_id = d.id
+            WHERE d.user_id = ?
+              AND dc.embedding IS NOT NULL
+            """;
+
+            Integer totalElements = jdbcTemplate.queryForObject(countSql, Integer.class, userId);
+
+            // Build paginated response
+            Map<String, Object> response = new HashMap<>();
+            response.put("content", results);
+            response.put("currentPage", page);
+            response.put("pageSize", size);
+            response.put("totalElements", totalElements);
+            response.put("totalPages", (int) Math.ceil((double) totalElements / size));
+
+            log.info("Found {} results for user {}, page {} of {}",
+                    results.size(), userId, page, response.get("totalPages"));
+
+            return response;
+
+        } catch (Exception e) {
+            log.error("Paginated search failed for user {}", userId, e);
+            throw new RuntimeException("Paginated search failed", e);
+        }
+    }
 }

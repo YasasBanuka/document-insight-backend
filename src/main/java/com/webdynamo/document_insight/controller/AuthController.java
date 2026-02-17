@@ -62,28 +62,4 @@ public class AuthController {
         AuthResponse response = authenticationService.refreshToken(request.refreshToken());
         return ResponseEntity.ok(response);
     }
-
-    @GetMapping("/me")
-    public ResponseEntity<UserInfo> getCurrentUser(
-            @AuthenticationPrincipal User user
-    ) {
-        log.info("Current user request for: {}", user.getEmail());
-
-        UserInfo userInfo = new UserInfo(
-                user.getId(),
-                user.getEmail(),
-                user.getRole().name()
-        );
-
-        return ResponseEntity.ok(userInfo);
-    }
-
-    /**
-     * Simple DTO for user information response
-     */
-    public record UserInfo(
-            Long id,
-            String email,
-            String role
-    ) {}
 }

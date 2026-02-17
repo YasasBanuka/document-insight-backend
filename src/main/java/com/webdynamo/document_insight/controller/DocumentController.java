@@ -220,8 +220,6 @@ public class DocumentController {
         );
     }
 
-
-
     /**
      * Get all chunks for a document
      */
@@ -358,14 +356,18 @@ public class DocumentController {
     public ResponseEntity<Map<String, Object>> searchDocumentsPaginated(
             @RequestParam("query") String query,
             @RequestParam(value = "page", defaultValue = "0") int page,
-            @RequestParam(value = "size", defaultValue = "5") int size) {
+            @RequestParam(value = "size", defaultValue = "5") int size,
+            @AuthenticationPrincipal User user
+    ) {
 
-        log.info("Paginated search: query='{}', page={}, size={}", query, page, size);
-
+        log.info("Paginated search: query='{}', page={}, size={} for user: {}",
+                query, page, size, user.getId());
         try {
-            Map<String, Object> results = vectorSearchService.searchSimilarChunksWithPagination(
-                    query, page, size
-            );
+            // Search only user's documents
+            Map<String, Object> results = vectorSearchService
+                    .searchSimilarChunksForUserPaginated(
+                            query, user.getId(), page, size
+                    );
             return ResponseEntity.ok(results);
 
         } catch (Exception e) {
