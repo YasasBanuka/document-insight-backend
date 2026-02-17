@@ -1,5 +1,7 @@
 package com.webdynamo.document_insight.service;
 
+import com.webdynamo.document_insight.model.DocumentChunk;
+import com.webdynamo.document_insight.model.User;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -11,6 +13,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.util.Map;
@@ -24,6 +27,7 @@ public class RAGQueryService {
     private final VectorSearchService vectorSearchService;
     private final ChatClient.Builder chatClientBuilder;
     private final ChatModel chatModel;
+    private final MetricsService metricsService;
 
     /**
      * Answer a question using RAG (Retrieval-Augmented Generation)
@@ -167,5 +171,37 @@ public class RAGQueryService {
 
         // Generate answer
         return chatModel.call(prompt);
+    }
+
+    public Flux<String> generateAnswerStream(String query, Long documentId, User user) {
+        log.info("Streaming RAG answer for user {} on document {}", user.getId(), documentId);
+
+        // Step 1: Search for relevant chunks in the document
+        List<Map<String, Object>> searchResults = vectorSearchService.searchInDocument(
+                documentId,
+                query,
+                7  // Get 7 context chunks
+        );
+
+        if (searchResults.isEmpty()) {
+            return Flux.just("I couldn't find relevant information in this document.");
+        }
+
+        // Step 2: Track metrics
+        metricsService.recordRagQuery(searchResults.size());
+
+        // Step 3: Build context
+        String context = buildContext(searchResults);
+
+        // Step 4: Build prompt
+        String promptText = buildPrompt(query, context);
+
+        // Step 5: Stream response from Ollama
+        ChatClient chatClient = chatClientBuilder.build();
+
+        return chatClient.prompt()
+                .user(promptText)
+                .stream()
+                .content();  // Returns Flux<String>
     }
 }

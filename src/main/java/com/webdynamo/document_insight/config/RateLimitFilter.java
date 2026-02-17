@@ -2,9 +2,11 @@ package com.webdynamo.document_insight.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webdynamo.document_insight.dto.ErrorResponse;
+import com.webdynamo.document_insight.model.BucketType;
 import com.webdynamo.document_insight.model.User;
 import com.webdynamo.document_insight.service.MetricsService;
 import com.webdynamo.document_insight.service.RateLimitService;
+import com.webdynamo.document_insight.util.RequestUtils;
 import io.github.bucket4j.Bucket;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
@@ -53,7 +55,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         } else {
             // Unauthenticated - use IP address
-            String ipAddress = getClientIP(request);
+            String ipAddress = RequestUtils.getClientIP(request);
             identifier = "IP-" + ipAddress;
             bucket = rateLimitService.resolveBucket(ipAddress);
         }
@@ -89,7 +91,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                     && authentication.getPrincipal() instanceof User;
 
             // Calculate retry-after seconds
-            long retryAfterSeconds = rateLimitService.getSecondsUntilRefill(bucket, isAuthenticated);
+            long retryAfterSeconds = rateLimitService.getRetryAfterSeconds(BucketType.GENERAL, isAuthenticated);
 
             // Create structured error response
             ErrorResponse errorResponse = new ErrorResponse(
@@ -110,16 +112,5 @@ public class RateLimitFilter extends OncePerRequestFilter {
             // Write JSON response
             response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
         }
-    }
-
-    /**
-     * Get client IP address from request
-     */
-    private String getClientIP(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 }

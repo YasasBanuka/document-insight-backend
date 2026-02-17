@@ -52,8 +52,6 @@ public class MetricsService {
      */
     public void recordRagQuery(int contextChunks) {
         meterRegistry.counter("rag.queries").increment();
-
         meterRegistry.summary("rag.context_chunks").record(contextChunks);
     }
-
 }

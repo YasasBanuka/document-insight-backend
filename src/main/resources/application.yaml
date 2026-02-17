@@ -48,9 +48,19 @@ rate-limit:
     refill-tokens: 100     # Refill 100 tokens
     refill-duration: 1m    # Every 1 minute
   unauthenticated:
-    capacity: 10           # 10 requests allowed
+    capacity: 10          # 10 requests allowed
     refill-tokens: 10      # Refill 10 tokens
     refill-duration: 1m    # Every 1 minute
+
+  rag:
+    authenticated:
+      capacity: 2          # 20 RAG queries allowed
+      refill-tokens: 2     # Refill 20 tokens
+      refill-duration: 1m  # Every 1 minutes
+    unauthenticated:
+      capacity: 5          # 5 RAG queries allowed
+      refill-tokens: 5     # Refill 5 tokens
+      refill-duration: 1m  # Every 1 minutes
 
 # Actuator Configuration for Metrics
 management:

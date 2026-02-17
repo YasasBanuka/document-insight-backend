@@ -1,5 +1,6 @@
 package com.webdynamo.document_insight.service;
 
+import com.webdynamo.document_insight.model.BucketType;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Refill;
@@ -32,6 +33,24 @@ public class RateLimitService {
 
     @Value("${rate-limit.unauthenticated.refill-duration}")
     private Duration unauthenticatedRefillDuration;
+
+    @Value("${rate-limit.rag.authenticated.capacity}")
+    private int ragAuthCapacity;
+
+    @Value("${rate-limit.rag.authenticated.refill-tokens}")
+    private int ragAuthRefillTokens;
+
+    @Value("${rate-limit.rag.authenticated.refill-duration}")
+    private Duration ragAuthRefillDuration;
+
+    @Value("${rate-limit.rag.unauthenticated.capacity}")
+    private int ragUnauthCapacity;
+
+    @Value("${rate-limit.rag.unauthenticated.refill-tokens}")
+    private int ragUnauthRefillTokens;
+
+    @Value("${rate-limit.rag.unauthenticated.refill-duration}")
+    private Duration ragUnauthRefillDuration;
 
     // Store buckets per user (in-memory)
     private final Map<String, Bucket> bucketCache = new ConcurrentHashMap<>();
@@ -95,7 +114,9 @@ public class RateLimitService {
 
     /**
      * Get seconds until bucket refills (for Retry-After header)
+     * @deprecated Use {@link #getRetryAfterSeconds(BucketType, boolean)} instead
      */
+    @Deprecated
     public long getSecondsUntilRefill(Bucket bucket, boolean isAuthenticated) {
         // If bucket has tokens available, no need to wait
         if (bucket.getAvailableTokens() > 0) {
@@ -110,5 +131,57 @@ public class RateLimitService {
         return refillDuration.getSeconds();
     }
 
+    /**
+     * Get or create RAG bucket for authenticated user
+     */
+    public Bucket getRAGBucket(String userId) {
+        String key = "rag:" + userId;
+        return bucketCache.computeIfAbsent(key, k -> {
+            Bandwidth limit = Bandwidth.classic(
+                    ragAuthCapacity,
+                    Refill.intervally(ragAuthRefillTokens, ragAuthRefillDuration)
+            );
+            return Bucket.builder()
+                    .addLimit(limit)
+                    .build();
+        });
+    }
 
+    /**
+     * Get or create RAG bucket for unauthenticated request
+     */
+    public Bucket getUnauthenticatedRAGBucket(String ip) {
+        String key = "rag:unauth:" + ip;
+        return bucketCache.computeIfAbsent(key, k -> {
+            Bandwidth limit = Bandwidth.classic(
+                    ragUnauthCapacity,  // 5 RAG queries per minute
+                    Refill.intervally(ragUnauthRefillTokens, ragUnauthRefillDuration)
+            );
+            return Bucket.builder()
+                    .addLimit(limit)
+                    .build();
+        });
+    }
+
+    /**
+     * Get retry-after duration in seconds for a given bucket type
+     * This is the GENERIC method that all filters will use
+     *
+     * @param type BucketType (GENERAL or RAG)
+     * @param isAuthenticated Whether user is authenticated
+     * @return Seconds to wait before retrying
+     */
+    public long getRetryAfterSeconds(BucketType type, boolean isAuthenticated) {
+        Duration duration = switch (type) {
+            case GENERAL -> isAuthenticated
+                    ? authenticatedRefillDuration
+                    : unauthenticatedRefillDuration;
+
+            case RAG -> isAuthenticated
+                    ? ragAuthRefillDuration
+                    : ragUnauthRefillDuration;
+        };
+
+        return duration.getSeconds();
+    }
 }
