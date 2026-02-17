@@ -2,6 +2,7 @@ package com.webdynamo.document_insight.controller;
 
 import com.webdynamo.document_insight.dto.DocumentDTO;
 import com.webdynamo.document_insight.dto.QuestionRequest;
+import com.webdynamo.document_insight.dto.RAGResponse;
 import com.webdynamo.document_insight.dto.UploadResponse;
 import com.webdynamo.document_insight.exception.DocumentNotFoundException;
 import com.webdynamo.document_insight.model.Document;
@@ -102,7 +103,7 @@ public class DocumentController {
             description = "Ask a question and get AI-generated answer based on document knowledge"
     )
     @GetMapping("/ask")
-    public ResponseEntity<Map<String, Object>> askQuestion(
+    public ResponseEntity<RAGResponse> askQuestion(
             @Valid @ModelAttribute QuestionRequest request,
             @AuthenticationPrincipal User user
     ) {
@@ -110,17 +111,14 @@ public class DocumentController {
 
         try {
             // Answer using only user's documents
-            String answer = ragQueryService.answerQuestionForUser(
+            RAGResponse response = ragQueryService.answerQuestionForUser(
                     request.getQuestion(),
                     user.getId(),
                     request.getContextChunks()
             );
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("question", request.getQuestion());
-            response.put("answer", answer);
-            response.put("contextChunks", request.getContextChunks());
             return ResponseEntity.ok(response);
+
         } catch (Exception e) {
             log.error("RAG query failed", e);
             return ResponseEntity.badRequest().build();

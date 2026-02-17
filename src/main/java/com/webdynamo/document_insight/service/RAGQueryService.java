@@ -1,5 +1,6 @@
 package com.webdynamo.document_insight.service;
 
+import com.webdynamo.document_insight.dto.RAGResponse;
 import com.webdynamo.document_insight.model.DocumentChunk;
 import com.webdynamo.document_insight.model.User;
 import jakarta.validation.constraints.Max;
@@ -141,7 +142,7 @@ public class RAGQueryService {
     /**
      * Answer question using only user's documents
      */
-    public String answerQuestionForUser(String question, Long userId, int contextChunks) {
+    public RAGResponse answerQuestionForUser(String question, Long userId, int contextChunks) {
         log.info("RAG Query for user {}: {}", userId, question);
 
         // Search only user's documents
@@ -149,8 +150,19 @@ public class RAGQueryService {
                 .searchSimilarChunksForUser(question, userId, contextChunks);
 
         if (relevantChunks.isEmpty()) {
-            return "I don't have enough information in your documents to answer this question.";
+            return new RAGResponse(
+                    "I don't have enough information in your documents to answer this question.",
+                    List.of()
+            );
         }
+
+        List<RAGResponse.Source> sources = relevantChunks.stream()
+                .map(chunk -> new RAGResponse.Source(
+                        (String) chunk.get("filename"),
+                        ((Number) chunk.get("similarity")).doubleValue(),
+                        ((Number) chunk.get("document_id")).longValue()
+                ))
+                .toList();
 
         // Build context from chunks
         String context = relevantChunks.stream()
@@ -170,7 +182,13 @@ public class RAGQueryService {
             """, context, question);
 
         // Generate answer
-        return chatModel.call(prompt);
+        String answer = chatModel.call(prompt);
+
+        // Track metrics
+        metricsService.recordRagQuery(relevantChunks.size());
+
+        // RETURN BOTH ANSWER AND SOURCES
+        return new RAGResponse(answer, sources);
     }
 
     public Flux<String> generateAnswerStream(String query, Long documentId, User user) {
