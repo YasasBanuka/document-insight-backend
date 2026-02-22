@@ -1,17 +1,15 @@
 package com.webdynamo.document_insight.controller;
 
-import com.webdynamo.document_insight.dto.DocumentDTO;
-import com.webdynamo.document_insight.dto.QuestionRequest;
-import com.webdynamo.document_insight.dto.RAGResponse;
-import com.webdynamo.document_insight.dto.UploadResponse;
+import com.webdynamo.document_insight.dto.*;
+import com.webdynamo.document_insight.dto.ConversationDTO;
+import com.webdynamo.document_insight.dto.MessageDTO;
 import com.webdynamo.document_insight.exception.DocumentNotFoundException;
+import com.webdynamo.document_insight.model.Conversation;
 import com.webdynamo.document_insight.model.Document;
 import com.webdynamo.document_insight.model.DocumentChunk;
 import com.webdynamo.document_insight.model.User;
-import com.webdynamo.document_insight.service.DocumentChunkService;
-import com.webdynamo.document_insight.service.DocumentService;
-import com.webdynamo.document_insight.service.RAGQueryService;
-import com.webdynamo.document_insight.service.VectorSearchService;
+import com.webdynamo.document_insight.service.ConversationService;
+import com.webdynamo.document_insight.service.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -19,6 +17,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.ollama.api.OllamaApi;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -44,6 +43,7 @@ public class DocumentController {
     private final DocumentChunkService documentChunkService;
     private final VectorSearchService vectorSearchService;
     private final RAGQueryService ragQueryService;
+    private final ConversationService conversationService;
 
     /**
      * Upload a new document with full processing
@@ -459,6 +459,101 @@ public class DocumentController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to generate preview: " + e.getMessage());
         }
+    }
+
+    /**
+     * Convert Conversation entity to DTO
+     */
+    private ConversationDTO toDTO(Conversation conversation) {
+        ConversationDTO dto = new ConversationDTO();
+        dto.setId(conversation.getId());
+        dto.setTitle(conversation.getTitle());
+        dto.setCreatedAt(conversation.getCreatedAt());
+        dto.setUpdatedAt(conversation.getUpdatedAt());
+
+        // Convert messages
+        List<MessageDTO> messageDTOs = conversation.getMessages().stream()
+                .map(msg -> new MessageDTO(
+                        msg.getId(),
+                        msg.getType().toString(),
+                        msg.getContent(),
+                        msg.getSources(),
+                        msg.getCreatedAt()
+                ))
+                .toList();
+
+        dto.setMessages(messageDTOs);
+        return dto;
+    }
+
+    @PostMapping("/conversations")
+    public ResponseEntity<ConversationDTO> createConversation(
+            @Valid @RequestBody QuestionRequest request,
+            @AuthenticationPrincipal User user
+    ) {
+        // Get RAG answer
+        RAGResponse response = ragQueryService.answerQuestionForUser(
+                request.getQuestion(), user.getId(), 7
+        );
+
+        // Save to conversation history
+        Conversation conversation = conversationService.createConversation(
+                user,
+                request.getQuestion(),
+                response.getAnswer(),
+                response.getSources()
+        );
+
+        return ResponseEntity.ok(toDTO(conversation));
+    }
+
+    @GetMapping("/conversations")
+    public ResponseEntity<List<ConversationDTO>> getConversations(@AuthenticationPrincipal User user) {
+        List<Conversation> conversations = conversationService.getUserConversations(user.getId());
+        return ResponseEntity.ok(conversations.stream().map(this::toDTO).toList());
+    }
+
+    @GetMapping("/conversations/{id}")
+    public ResponseEntity<ConversationDTO> getConversation(
+            @PathVariable Long id,
+            @AuthenticationPrincipal User user
+    ) {
+        Conversation conversation = conversationService.getConversation(id, user.getId());
+        return ResponseEntity.ok(toDTO(conversation));
+    }
+
+    @PostMapping("/conversations/{id}/messages")
+    public ResponseEntity<ConversationDTO> addMessageToConversation(
+            @PathVariable Long id,
+            @Valid @RequestBody QuestionRequest request,
+            @AuthenticationPrincipal User user
+    ) {
+        // Get RAG answer
+        RAGResponse response = ragQueryService.answerQuestionForUser(
+                request.getQuestion(), user.getId(), 7
+        );
+
+        // Add to existing conversation
+        conversationService.addMessage(
+                id,
+                user,
+                request.getQuestion(),
+                response.getAnswer(),
+                response.getSources()
+        );
+
+        // Return updated conversation
+        Conversation conversation = conversationService.getConversation(id, user.getId());
+        return ResponseEntity.ok(toDTO(conversation));
+    }
+
+    @DeleteMapping("/conversations/{id}")
+    public ResponseEntity<Void> deleteConversation(
+            @PathVariable Long id,
+            @AuthenticationPrincipal User user
+    ) {
+        conversationService.deleteConversation(id, user.getId());
+        return ResponseEntity.noContent().build();
     }
 
 }
