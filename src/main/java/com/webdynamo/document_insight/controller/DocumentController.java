@@ -17,7 +17,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.ollama.api.OllamaApi;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -519,6 +518,9 @@ public class DocumentController {
             @AuthenticationPrincipal User user
     ) {
         Conversation conversation = conversationService.getConversation(id, user.getId());
+        if (conversation == null) {
+            return ResponseEntity.notFound().build();
+        }
         return ResponseEntity.ok(toDTO(conversation));
     }
 

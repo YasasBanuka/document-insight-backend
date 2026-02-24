@@ -32,7 +32,6 @@ public class ConversationMessage {
     private String content;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
     private List<RAGResponse.Source> sources;
 
     @Column(name = "created_at")

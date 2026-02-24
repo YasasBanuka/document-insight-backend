@@ -44,8 +44,11 @@ public class RAGRateLimitFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
-        // Only apply to RAG endpoints
-        if (!path.contains("/ask")) {
+        // Only apply to RAG endpoints (/ask and POST /conversations)
+        boolean isRagPath = path.contains("/ask") || 
+                           (path.contains("/conversations") && (request.getMethod().equals("POST")));
+        
+        if (!isRagPath) {
             filterChain.doFilter(request, response);
             return;
         }

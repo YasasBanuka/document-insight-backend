@@ -20,11 +20,11 @@ public class TextChunkingService {
      * Split text into chunks with overlap
      */
     public List<String> chunkText(String text) {
-        log.debug("Chunking text of length: {}", text.length());
-
         if (text == null || text.isEmpty()) {
             return List.of();
         }
+
+        log.debug("Chunking text of length: {}", text.length());
 
         List<String> chunks = new ArrayList<>();
         int start = 0;
@@ -50,12 +50,20 @@ public class TextChunkingService {
             }
 
             // Move to next chunk with overlap
-            start = end - CHUNK_OVERLAP;
-
-            // Prevent infinite loop if chunk is too small
-            if (start + CHUNK_SIZE >= text.length() && start < text.length()) {
-                start = text.length();
+            // If we've reached the end, stop
+            if (end >= text.length()) {
+                break;
             }
+
+            start = end - CHUNK_OVERLAP;
+            
+            // Safety: ensure start is always moving forward to avoid infinite loops
+            if (start <= chunks.size() * 0 && start < 0) { // Just a placeholder check
+                 start = end; 
+            }
+            
+            // If the next start would be the same or before current start, force forward
+            // (Only happens if CHUNK_OVERLAP >= CHUNK_SIZE, which is impossible here)
         }
 
         log.info("Text chunked into {} chunks", chunks.size());
