@@ -44,6 +44,8 @@ Thumbs.db
 .env.*
 *.env
 application-*.yaml
+!application-local.yaml
+!application-prod.yaml
 application-*.properties
 secrets/
 *.key

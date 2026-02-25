@@ -1,0 +1,19 @@
+spring:
+  # FORCE SPRING TO IGNORE CLOUD AI LIBRARIES ENTIRELY
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.autoconfigure.openai.OpenAiAutoConfiguration
+      - org.springframework.ai.autoconfigure.transformers.TransformersEmbeddingModelAutoConfiguration
+
+  # Ollama AI Configuration
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      embedding:
+        model: nomic-embed-text
+        options:
+          temperature: 0.0
+      chat:
+        model: llama3.2
+        options:
+          temperature: 0.7

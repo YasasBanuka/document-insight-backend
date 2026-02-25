@@ -1,0 +1,22 @@
+spring:
+  # FORCE SPRING TO IGNORE LOCAL OLLAMA ENTIRELY
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.autoconfigure.ollama.OllamaAutoConfiguration
+
+  # Groq Cloud API for Chat
+  ai:
+    openai:
+      api-key: ${GROQ_API_KEY}
+      base-url: https://api.groq.com/openai
+      chat:
+        options:
+          model: llama-3.3-70b-versatile
+          temperature: 0.7
+
+    # JVM-Local ONNX Model for Embeddings
+    transformers:
+      embedding:
+        options:
+          modelUri: "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx"
+          tokenizerUri: "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/tokenizer.json"
