@@ -95,6 +95,18 @@
 			<artifactId>spring-ai-ollama-spring-boot-starter</artifactId>
 		</dependency>
 
+		<!-- Spring AI for Groq -->
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-openai-spring-boot-starter</artifactId>
+		</dependency>
+
+		<!-- Spring AI Transformers (for Lightning-fast JVM-Local Embeddings) -->
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-transformers-spring-boot-starter</artifactId>
+		</dependency>
+
 		<!-- For PDF parsing -->
 		<dependency>
 			<groupId>org.apache.pdfbox</groupId>

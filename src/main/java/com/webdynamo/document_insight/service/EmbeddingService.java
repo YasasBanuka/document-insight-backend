@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
+import org.springframework.ai.embedding.EmbeddingOptionsBuilder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -25,7 +26,7 @@ public class EmbeddingService {
 
         try {
             // Create embedding request
-            EmbeddingRequest request = new EmbeddingRequest(List.of(text), null);
+            EmbeddingRequest request = new EmbeddingRequest(List.of(text), EmbeddingOptionsBuilder.builder().build());
 
             // Get embedding response
             EmbeddingResponse response = embeddingModel.call(request);
@@ -50,7 +51,7 @@ public class EmbeddingService {
 
         try {
             // Create batch request
-            EmbeddingRequest request = new EmbeddingRequest(texts, null);
+            EmbeddingRequest request = new EmbeddingRequest(texts, EmbeddingOptionsBuilder.builder().build());
 
             // Get embeddings
             EmbeddingResponse response = embeddingModel.call(request);
