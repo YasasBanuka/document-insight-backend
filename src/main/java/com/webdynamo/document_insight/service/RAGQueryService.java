@@ -1,14 +1,24 @@
 package com.webdynamo.document_insight.service;
 
+import com.webdynamo.document_insight.dto.RAGResponse;
+import com.webdynamo.document_insight.model.DocumentChunk;
+import com.webdynamo.document_insight.model.User;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +27,8 @@ public class RAGQueryService {
 
     private final VectorSearchService vectorSearchService;
     private final ChatClient.Builder chatClientBuilder;
+    private final ChatModel chatModel;
+    private final MetricsService metricsService;
 
     /**
      * Answer a question using RAG (Retrieval-Augmented Generation)
@@ -125,5 +137,89 @@ public class RAGQueryService {
         ));
 
         return prompt.getContents();
+    }
+
+    /**
+     * Answer question using only user's documents
+     */
+    public RAGResponse answerQuestionForUser(String question, Long userId, int contextChunks) {
+        log.info("RAG Query for user {}: {}", userId, question);
+
+        // Search only user's documents
+        List<Map<String, Object>> relevantChunks = vectorSearchService
+                .searchSimilarChunksForUser(question, userId, contextChunks);
+
+        if (relevantChunks.isEmpty()) {
+            return new RAGResponse(
+                    "I don't have enough information in your documents to answer this question.",
+                    List.of()
+            );
+        }
+
+        List<RAGResponse.Source> sources = relevantChunks.stream()
+                .map(chunk -> new RAGResponse.Source(
+                        (String) chunk.get("filename"),
+                        ((Number) chunk.get("similarity")).doubleValue(),
+                        ((Number) chunk.get("document_id")).longValue()
+                ))
+                .toList();
+
+        // Build context from chunks
+        String context = relevantChunks.stream()
+                .map(chunk -> (String) chunk.get("content"))
+                .collect(Collectors.joining("\n\n"));
+
+        // Build prompt
+        String prompt = String.format("""
+            You are a helpful AI assistant. Answer the question based ONLY on the provided context.
+            
+            Context:
+            %s
+            
+            Question: %s
+            
+            Answer:
+            """, context, question);
+
+        // Generate answer
+        String answer = chatModel.call(prompt);
+
+        // Track metrics
+        metricsService.recordRagQuery(relevantChunks.size());
+
+        // RETURN BOTH ANSWER AND SOURCES
+        return new RAGResponse(answer, sources);
+    }
+
+    public Flux<String> generateAnswerStream(String query, Long documentId, User user) {
+        log.info("Streaming RAG answer for user {} on document {}", user.getId(), documentId);
+
+        // Step 1: Search for relevant chunks in the document
+        List<Map<String, Object>> searchResults = vectorSearchService.searchInDocument(
+                documentId,
+                query,
+                7  // Get 7 context chunks
+        );
+
+        if (searchResults.isEmpty()) {
+            return Flux.just("I couldn't find relevant information in this document.");
+        }
+
+        // Step 2: Track metrics
+        metricsService.recordRagQuery(searchResults.size());
+
+        // Step 3: Build context
+        String context = buildContext(searchResults);
+
+        // Step 4: Build prompt
+        String promptText = buildPrompt(query, context);
+
+        // Step 5: Stream response from Ollama
+        ChatClient chatClient = chatClientBuilder.build();
+
+        return chatClient.prompt()
+                .user(promptText)
+                .stream()
+                .content();  // Returns Flux<String>
     }
 }

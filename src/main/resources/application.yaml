@@ -1,34 +1,20 @@
 spring:
+  profiles:
+    active: local
   application:
-    name: document-insight
-
-  # Ollama AI Configuration
-  ai:
-    ollama:
-      base-url: http://localhost:11434
-      embedding:
-        model: nomic-embed-text
-        options:
-          temperature: 0.0
-      chat:
-        model: llama3.2
-        options:
-          temperature: 0.7
-
+    name: docura
   # Add file upload configuration
   servlet:
     multipart:
       enabled: true
-      max-file-size: 10MB      # Max file size per request
-      max-request-size: 10MB   # Max total request size
-      file-size-threshold: 2KB # Files larger than this are written to disk
-
+      max-file-size: 10MB
+      max-request-size: 10MB
+      file-size-threshold: 2KB
   datasource:
     url: jdbc:postgresql://localhost:5433/document_insight
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
-
   jpa:
     hibernate:
       ddl-auto: update
@@ -40,6 +26,43 @@ spring:
 
 server:
   port: 8080
+
+# Rate Limiting Configuration
+rate-limit:
+  authenticated:
+    capacity: 100
+    refill-tokens: 100
+    refill-duration: 1m
+  unauthenticated:
+    capacity: 10
+    refill-tokens: 10
+    refill-duration: 1m
+  rag:
+    authenticated:
+      capacity: 20
+      refill-tokens: 20
+      refill-duration: 1m
+    unauthenticated:
+      capacity: 5
+      refill-tokens: 5
+      refill-duration: 1m
+
+# Actuator Configuration for Metrics
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+      base-path: /actuator
+  metrics:
+    tags:
+      application: docura
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:mySecretKeyThatIsAtLeast256BitsLongForHS256AlgorithmSecurityRequirement}
+  expiration: 86400000
+  refresh-expiration: 604800000
 
 # Custom application properties
 application:
