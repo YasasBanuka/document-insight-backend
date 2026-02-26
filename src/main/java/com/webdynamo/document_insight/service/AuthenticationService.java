@@ -59,6 +59,7 @@ public class AuthenticationService {
                 refreshToken,
                 savedUser.getId(),
                 savedUser.getEmail(),
+                savedUser.getName(),
                 savedUser.getRole().name()
         );
     }
@@ -97,6 +98,7 @@ public class AuthenticationService {
                 refreshToken,
                 user.getId(),
                 user.getEmail(),
+                user.getName(),
                 user.getRole().name()
         );
     }
@@ -136,6 +138,7 @@ public class AuthenticationService {
                 newRefreshToken,
                 user.getId(),
                 user.getEmail(),
+                user.getName(),
                 user.getRole().name()
         );
     }

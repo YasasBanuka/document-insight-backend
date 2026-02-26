@@ -1,3 +1,10 @@
+# Disable Swagger API docs in production for security
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+    
 spring:
   # FORCE SPRING TO IGNORE LOCAL OLLAMA ENTIRELY
   autoconfigure:

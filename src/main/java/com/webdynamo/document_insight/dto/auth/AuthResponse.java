@@ -19,6 +19,8 @@ public record AuthResponse(
         Long userId,
 
         String email,
+        
+        String name,
 
         String role,
 
@@ -31,8 +33,9 @@ public record AuthResponse(
             String refreshToken,
             Long userId,
             String email,
+            String name,
             String role
     ) {
-        this(accessToken, refreshToken, userId, email, role, "Bearer");
+        this(accessToken, refreshToken, userId, email, name, role, "Bearer");
     }
 }

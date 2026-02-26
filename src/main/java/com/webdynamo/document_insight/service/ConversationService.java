@@ -13,9 +13,12 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.transaction.annotation.Transactional;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional
 public class ConversationService {
 
     private final ConversationRepository conversationRepository;
@@ -81,22 +84,31 @@ public class ConversationService {
         // Update conversation timestamp
         conversation.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conversation);
+        
+        // Ensure messages collection is initialized
+        conversation.getMessages().size();
     }
 
     /**
      * Get all user conversations
      */
+    @Transactional(readOnly = true)
     public List<Conversation> getUserConversations(Long userId) {
-        return conversationRepository.findByUserIdOrderByUpdatedAtDesc(userId);
+        List<Conversation> conversations = conversationRepository.findByUserIdOrderByUpdatedAtDesc(userId);
+        conversations.forEach(c -> c.getMessages().size()); // force initialization
+        return conversations;
     }
 
     /**
      * Get conversation with messages
      */
+    @Transactional(readOnly = true)
     public Conversation getConversation(Long conversationId, Long userId) {
-        return conversationRepository
+        Conversation conv = conversationRepository
                 .findByIdAndUserId(conversationId, userId)
                 .orElseThrow(() -> new RuntimeException("Conversation not found"));
+        conv.getMessages().size(); // force initialization
+        return conv;
     }
 
     /**
