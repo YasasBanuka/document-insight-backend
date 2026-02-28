@@ -24,7 +24,7 @@ This Spring Boot application is the core intelligence of Docura. It:
 
 1. **Ingests** uploaded PDFs, DOCX, and TXT files using Apache PDFBox and Apache POI.
 2. **Chunks** the extracted text using a sliding-window algorithm (2000 chars, 200-char overlap, sentence-boundary detection).
-3. **Embeds** each chunk locally on the JVM using the ONNX `all-MiniLM-L6-v2` model (384-dimensional vectors) — no third-party embedding API costs.
+3. **Embeds** each chunk locally — on `local` profile using Ollama `nomic-embed-text` (768-dim), on `prod` profile using ONNX `all-MiniLM-L6-v2` running in the JVM (384-dim) — no third-party embedding API costs in either case.
 4. **Stores** vectors in PostgreSQL 16 with the `pgvector` extension.
 5. **Retrieves** the top 7 most relevant chunks per user query using the `<=>` cosine distance operator, filtered by the authenticated user's ID.
 6. **Generates** a contextual answer by injecting the retrieved chunks into a LLaMA prompt, streamed back via Server-Sent Events (SSE).
@@ -74,7 +74,8 @@ src/main/java/com/webdynamo/document_insight/
 
 | Concern | Solution |
 |---|---|
-| **Embeddings** | ONNX `all-MiniLM-L6-v2` on JVM — zero API cost, zero data egress |
+| **Embeddings (local)** | Ollama `nomic-embed-text` — 768-dim, runs fully offline |
+| **Embeddings (prod)** | ONNX `all-MiniLM-L6-v2` on JVM — 384-dim, zero API cost, zero data egress |
 | **Text Generation** | Groq `llama-3.3-70b-versatile` via Spring AI (prod) / Ollama (local) |
 | **Vector Search** | PostgreSQL pgvector `<=>` cosine distance, user-filtered SQL |
 | **Authentication** | Stateless JWT HS256, BCrypt password hashing |
@@ -90,7 +91,7 @@ src/main/java/com/webdynamo/document_insight/
 - Java 21 JDK
 - Maven 3.9+
 - PostgreSQL 16 with `pgvector` extension (or Docker)
-- [Ollama](https://ollama.ai) running locally with `llama3.2` and `all-minilm` models
+- [Ollama](https://ollama.ai) running locally with `llama3.2` and `nomic-embed-text` models
 
 ### 1. Start PostgreSQL with pgvector
 
@@ -163,10 +164,12 @@ See [Security & Testing Report](docs/security_and_testing.md) for the full break
 
 ## 📡 Spring Profiles
 
-| Profile | Chat Model | Embedding Model |
-|---|---|---|
-| `local` | Ollama `llama3.2` | Ollama `all-minilm` |
-| `prod` | Groq `llama-3.3-70b-versatile` | ONNX `all-MiniLM-L6-v2` (JVM) |
+| Profile | Chat Model | Embedding Model | Dimensions |
+|---|---|---|---|
+| `local` | Ollama `llama3.2` | Ollama `nomic-embed-text` | **768-dim** |
+| `prod` | Groq `llama-3.3-70b-versatile` | ONNX `all-MiniLM-L6-v2` (JVM) | **384-dim** |
+
+> ⚠️ **Critical**: These embedding models are **incompatible**. `nomic-embed-text` produces 768-dimensional vectors; `all-MiniLM-L6-v2` produces 384-dimensional vectors. Never mix profiles on the same database — always wipe and re-index when switching.
 
 Activate with: `-Dspring-boot.run.profiles=prod` or `SPRING_PROFILES_ACTIVE=prod` env var.
 

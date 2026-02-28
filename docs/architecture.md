@@ -43,9 +43,9 @@ graph LR
     subgraph Ingestion Path
         A[Document Text] --> B[EmbeddingService]
         B --> C{Profile?}
-        C -->|local| D[Ollama all-minilm Local]
-        C -->|prod| E[ONNX MiniLM-L6-v2 JVM]
-        D --> F[float-384-dims]
+        C -->|local| D["Ollama nomic-embed-text\n768-dim vectors"]
+        C -->|prod| E["ONNX all-MiniLM-L6-v2\n384-dim vectors (JVM)"]
+        D --> F[float-768 or float-384]
         E --> F
     end
 
@@ -60,7 +60,7 @@ graph LR
     end
 ```
 
-**Key Design Insight**: Both profiles use models from the same `sentence-transformers` family, ensuring embedding space consistency. A document uploaded on `local` profile and queried later on `prod` profile will still retrieve results correctly, because both models understand the same semantic vector space.
+**⚠️ Critical Compatibility Note**: `nomic-embed-text` (local) produces **768-dimensional** vectors. `all-MiniLM-L6-v2` (prod) produces **384-dimensional** vectors. These two embedding spaces are **completely incompatible** — you cannot query vectors indexed with one model using the other. Always use a single profile consistently per database instance.
 
 ---
 
@@ -287,12 +287,14 @@ Incoming Request
 
 ## 9. Spring Boot Profile System
 
-The system uses three Spring Boot profiles to manage environment-specific AI configurations:
+The system uses two Spring Boot profiles to manage environment-specific AI configurations:
 
-| Profile | Chat Model | Embedding Model | Use Case |
+| Profile | Chat Model | Embedding Model | Dimensions |
 |---|---|---|---|
-| `local` | Ollama `llama3.2` (local) | Ollama `all-minilm` (local) | Local development — no cloud costs |
-| `prod` | Groq `llama-3.3-70b-versatile` | ONNX `all-MiniLM-L6-v2` (JVM) | Cloud deployment — fastest responses |
+| `local` | Ollama `llama3.2` (local) | Ollama `nomic-embed-text` (local) | **768** |
+| `prod` | Groq `llama-3.3-70b-versatile` | ONNX `all-MiniLM-L6-v2` (JVM) | **384** |
+
+> ⚠️ **Critical**: These two embedding models produce vectors of **different dimensions** (768 vs 384). Documents indexed on the `local` profile cannot be queried from the `prod` profile — and vice versa. Switching profiles on a database that already contains vectors will cause cosine similarity failures. Always use one profile consistently per database, or wipe and re-index when switching.
 
 The `application-prod.yaml` explicitly excludes `OllamaAutoConfiguration` to prevent Spring AI from attempting to connect to a non-existent local Ollama server:
 ```yaml
